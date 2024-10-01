@@ -3,9 +3,7 @@ from .models import Note, Piece
 from . import db
 from datetime import datetime
 
-# Create a blueprint for notes routes
 notes_bp = Blueprint('notes', __name__)
-
 
 # Create a Note
 @notes_bp.route('/', methods=['POST'])
@@ -22,7 +20,6 @@ def create_note():
     db.session.commit()
 
     return jsonify({'message': 'Note created successfully!', 'note_id': note.id}), 201
-
 
 # Get All Notes
 @notes_bp.route('/', methods=['GET'])
@@ -41,13 +38,14 @@ def get_notes():
 
     return jsonify(result), 200
 
-
 # Update a Note
 @notes_bp.route('/<int:note_id>', methods=['PUT'])
 def update_note(note_id):
-    note = Note.query.get_or_404(note_id)
-    data = request.get_json()
+    note = db.session.get(Note, note_id)  # Use Session.get() instead of Query.get()
+    if note is None:
+        return jsonify({'message': 'Note not found'}), 404
 
+    data = request.get_json()
     pieces_data = data.get('pieces', [])
 
     # Clear existing pieces
@@ -59,17 +57,19 @@ def update_note(note_id):
         note._pieces.append(piece)
 
     note.last_update_timestamp = datetime.now()
-
     db.session.commit()
 
     return jsonify({'message': 'Note updated successfully!'}), 200
 
-
 # Delete a Note
 @notes_bp.route('/<int:note_id>', methods=['DELETE'])
 def delete_note(note_id):
-    note = Note.query.get_or_404(note_id)
+    note = db.session.get(Note, note_id)  # Use Session.get() instead of Query.get()
+    if note is None:
+        return jsonify({'message': 'Note not found'}), 404
+
     db.session.delete(note)
     db.session.commit()
 
     return jsonify({'message': 'Note deleted successfully!'}), 200
+

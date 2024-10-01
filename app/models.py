@@ -6,7 +6,7 @@ class Piece(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     text = db.Column(db.String, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.now)
-    note_id = db.Column(db.Integer, db.ForeignKey('notes.id'))  # ForeignKey to link Piece to Note
+    note_id = db.Column(db.Integer, db.ForeignKey('notes.id', ondelete='CASCADE'))
 
     def __init__(self, content: str):
         self.text = content
@@ -18,7 +18,8 @@ class Note(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     timestamp = db.Column(db.DateTime, default=datetime.now)
     last_update_timestamp = db.Column(db.DateTime, default=datetime.now)
-    _pieces = db.relationship("Piece", backref="note", cascade="all, delete-orphan")
+
+    _pieces = db.relationship("Piece", backref="note", cascade="all, delete-orphan", passive_deletes=True)
 
     def __init__(self):
         self.timestamp = datetime.now()
@@ -27,3 +28,8 @@ class Note(db.Model):
     def update(self, pieces):
         self._pieces = pieces
         self.last_update_timestamp = datetime.now()
+
+    __mapper_args__ = {
+        "confirm_deleted_rows": False  # Disable confirmation of the number of rows deleted
+    }
+
