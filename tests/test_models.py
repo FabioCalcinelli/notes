@@ -5,8 +5,8 @@ from app import db
 def test_create_note_with_pieces(init_database):
     # Create a new Note object
     note = Note()
-    piece1 = Piece(content="This is the first piece")
-    piece2 = Piece(content="This is the second piece")
+    piece1 = Piece(text="This is the first piece")
+    piece2 = Piece(text="This is the second piece")
 
     # Add pieces to the note
     note._pieces.append(piece1)
@@ -27,7 +27,7 @@ def test_create_note_with_pieces(init_database):
 def test_note_update(init_database):
     # Create a new note with some pieces
     note = Note()
-    piece1 = Piece(content="Old piece")
+    piece1 = Piece(text="Old piece")
     note._pieces.append(piece1)
 
     # Save the note
@@ -40,8 +40,8 @@ def test_note_update(init_database):
     assert saved_note._pieces[0].text == "Old piece"
 
     # Update the note with new pieces
-    piece2 = Piece(content="New piece 1")
-    piece3 = Piece(content="New piece 2")
+    piece2 = Piece(text="New piece 1")
+    piece3 = Piece(text="New piece 2")
     saved_note.update([piece2, piece3])
 
     db.session.commit()
@@ -57,8 +57,8 @@ def test_note_update(init_database):
 def test_delete_note_with_pieces(init_database):
     # Create a new note and pieces
     note = Note()
-    piece1 = Piece(content="Piece 1")
-    piece2 = Piece(content="Piece 2")
+    piece1 = Piece(text="Piece 1")
+    piece2 = Piece(text="Piece 2")
     note._pieces.append(piece1)
     note._pieces.append(piece2)
 

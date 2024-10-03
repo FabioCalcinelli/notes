@@ -13,7 +13,7 @@ def create_note():
 
     note = Note()
     for piece_content in pieces_data:
-        piece = Piece(content=piece_content)
+        piece = Piece(text=piece_content)
         note._pieces.append(piece)
 
     db.session.add(note)
@@ -53,7 +53,7 @@ def update_note(note_id):
 
     # Add new pieces
     for piece_content in pieces_data:
-        piece = Piece(content=piece_content)
+        piece = Piece(text=piece_content)
         note._pieces.append(piece)
 
     note.last_update_timestamp = datetime.now()

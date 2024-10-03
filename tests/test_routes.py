@@ -8,8 +8,8 @@ def create_sample_note(init_database):
     Fixture to create a sample note with two pieces for testing.
     """
     note = Note()
-    piece1 = Piece(content="Piece 1 content")
-    piece2 = Piece(content="Piece 2 content")
+    piece1 = Piece(text="Piece 1 content")
+    piece2 = Piece(text="Piece 2 content")
     note._pieces.append(piece1)
     note._pieces.append(piece2)
     db.session.add(note)

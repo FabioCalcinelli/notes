@@ -1,4 +1,6 @@
 from datetime import datetime
+from typing import List
+
 from . import db
 
 class Piece(db.Model):
@@ -8,9 +10,8 @@ class Piece(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.now)
     note_id = db.Column(db.Integer, db.ForeignKey('notes.id', ondelete='CASCADE'))
 
-    def __init__(self, content: str):
-        self.text = content
-        self.timestamp = datetime.now()
+    def __init__(self, text: str):
+        self.text = text
 
 
 class Note(db.Model):
@@ -25,7 +26,7 @@ class Note(db.Model):
         self.timestamp = datetime.now()
         self.last_update_timestamp = self.timestamp
 
-    def update(self, pieces):
+    def update(self, pieces: List[Piece]):
         self._pieces = pieces
         self.last_update_timestamp = datetime.now()
 
