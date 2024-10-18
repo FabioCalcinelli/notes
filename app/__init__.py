@@ -10,9 +10,9 @@ import os
 def create_app(config_class='app.config.Config'):
     app = Flask(__name__)
     app.config.from_object(config_class)
-    db_dir = os.path.dirname(app.config['SQLALCHEMY_DATABASE_URI'].split('sqlite:///')[-1])
-    if not os.path.exists(db_dir):
-        os.makedirs(db_dir)
+    import pathlib
+    db_path = pathlib.Path(app.config['SQLALCHEMY_DATABASE_URI'].split('sqlite:///')[-1])
+    db_path.parent.mkdir(parents=True, exist_ok=True)
 
     db.init_app(app)
     CORS(app, resources={r"/notes/*": {"origins": "*"}, r"/notes/": {"origins": "*"}})
