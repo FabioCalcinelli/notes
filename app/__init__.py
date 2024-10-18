@@ -11,7 +11,7 @@ def create_app(config_class='app.config.Config'):
     app.config.from_object(config_class)
 
     db.init_app(app)
-    CORS(app)  # Initialize CORS
+    CORS(app, resources={r"/notes/*": {"origins": "*"}})  # Enable CORS only for /notes routes
 
     from app.routes import notes_bp
     app.register_blueprint(notes_bp, url_prefix='/notes')
