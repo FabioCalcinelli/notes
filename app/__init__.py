@@ -20,5 +20,8 @@ def create_app(config_class='app.config.Config'):
     from app.routes import notes_bp
     app.register_blueprint(notes_bp, url_prefix='/notes')
 
+    with app.app_context():
+        db.create_all()
+
     return app
 
