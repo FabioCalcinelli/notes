@@ -9,6 +9,7 @@ flask = "*"
 flask-sqlalchemy = "*"
 pytest = "*"
 pytest-flask = "*"
+flask-cors = "*"
 
 [dev-packages]
 
