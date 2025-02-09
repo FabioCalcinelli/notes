@@ -26,7 +26,7 @@ def test_create_note_success(client, init_database):
     data = {
         'pieces': ['Piece 1', 'Piece 2']
     }
-    response = client.post('/notes/', json=data)
+    response = client.post('/notes/notes', json=data)
     assert response.status_code == 201
     assert b'Note created successfully!' in response.data
 
@@ -39,7 +39,7 @@ def test_create_note_success(client, init_database):
 
 def test_create_note_empty_pieces(client, init_database):
     data = {}
-    response = client.post('/notes/', json=data)
+    response = client.post('/notes/notes', json=data)
     assert response.status_code == 201  # Expect success with empty pieces
     assert b'Note created successfully!' in response.data
 
@@ -50,12 +50,12 @@ def test_create_note_empty_pieces(client, init_database):
 
 # Test retrieving all notes
 def test_get_notes_empty(client, init_database):
-    response = client.get('/notes/')
+    response = client.get('/notes/notes')
     assert response.status_code == 200
     assert response.json == []
 
 def test_get_notes_with_data(client, init_database, create_sample_note):
-    response = client.get('/notes/')
+    response = client.get('/notes/notes')
     assert response.status_code == 200
     assert len(response.json) == 1
 
@@ -72,7 +72,7 @@ def test_update_note_success(client, init_database, create_sample_note):
     data = {
         'pieces': ['Updated Piece 1', 'Updated Piece 2']
     }
-    response = client.put(f'/notes/{note_id}', json=data)
+    response = client.put(f'/notes/notes/{note_id}', json=data)
     assert response.status_code == 200
     assert b'Note updated successfully!' in response.data
 
@@ -87,13 +87,13 @@ def test_update_note_not_found(client, init_database):
     data = {
         'pieces': ['Updated Piece 1', 'Updated Piece 2']
     }
-    response = client.put(f'/notes/{note_id}', json=data)
+    response = client.put(f'/notes/notes{note_id}', json=data)
     assert response.status_code == 404
 
 # Test deleting a note
 def test_delete_note_success(client, init_database, create_sample_note):
     note_id = create_sample_note.id
-    response = client.delete(f'/notes/{note_id}')
+    response = client.delete(f'/notes/notes/{note_id}')
     assert response.status_code == 200
     assert b'Note deleted successfully!' in response.data
 
@@ -103,6 +103,5 @@ def test_delete_note_success(client, init_database, create_sample_note):
 
 def test_delete_note_not_found(client, init_database):
     note_id = 999  # Non-existent note
-    response = client.delete(f'/notes/{note_id}')
+    response = client.delete(f'/notes/notes/{note_id}')
     assert response.status_code == 404
-

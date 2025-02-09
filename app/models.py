@@ -34,3 +34,19 @@ class Note(db.Model):
         "confirm_deleted_rows": False  # Disable confirmation of the number of rows deleted
     }
 
+class Todo(db.Model):
+    __tablename__ = "todos"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    text = db.Column(db.String, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.now)
+    completion_timestamp = db.Column(db.DateTime, default=None)
+    completed = db.Column(db.Boolean, default=False)
+
+    def __init__(self, text: str):
+        self.timestamp = datetime.now()
+        self.text = text
+        self.completed = False
+
+    def complete(self):
+        self.completed = True
+        self.completion_timestamp = datetime.now()
