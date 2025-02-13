@@ -9,8 +9,8 @@ def test_create_note_with_pieces(init_database):
     piece2 = Piece(text="This is the second piece")
 
     # Add pieces to the note
-    note._pieces.append(piece1)
-    note._pieces.append(piece2)
+    note.pieces.append(piece1)
+    note.pieces.append(piece2)
 
     # Save the note (which saves the pieces as well)
     db.session.add(note)
@@ -19,16 +19,16 @@ def test_create_note_with_pieces(init_database):
     # Fetch the note and check if it's saved correctly
     saved_note = Note.query.first()
     assert saved_note is not None
-    assert len(saved_note._pieces) == 2
-    assert saved_note._pieces[0].text == "This is the first piece"
-    assert saved_note._pieces[1].text == "This is the second piece"
+    assert len(saved_note.pieces) == 2
+    assert saved_note.pieces[0].text == "This is the first piece"
+    assert saved_note.pieces[1].text == "This is the second piece"
 
 
 def test_note_update(init_database):
     # Create a new note with some pieces
     note = Note()
     piece1 = Piece(text="Old piece")
-    note._pieces.append(piece1)
+    note.pieces.append(piece1)
 
     # Save the note
     db.session.add(note)
@@ -36,8 +36,8 @@ def test_note_update(init_database):
 
     # Verify that the note has 1 piece
     saved_note = Note.query.first()
-    assert len(saved_note._pieces) == 1
-    assert saved_note._pieces[0].text == "Old piece"
+    assert len(saved_note.pieces) == 1
+    assert saved_note.pieces[0].text == "Old piece"
 
     # Update the note with new pieces
     piece2 = Piece(text="New piece 1")
@@ -48,9 +48,9 @@ def test_note_update(init_database):
 
     # Fetch the updated note and verify changes
     updated_note = Note.query.first()
-    assert len(updated_note._pieces) == 2
-    assert updated_note._pieces[0].text == "New piece 1"
-    assert updated_note._pieces[1].text == "New piece 2"
+    assert len(updated_note.pieces) == 2
+    assert updated_note.pieces[0].text == "New piece 1"
+    assert updated_note.pieces[1].text == "New piece 2"
     assert updated_note.last_update_timestamp > updated_note.timestamp  # Ensure last_update_timestamp is updated
 
 
@@ -59,8 +59,8 @@ def test_delete_note_with_pieces(init_database):
     note = Note()
     piece1 = Piece(text="Piece 1")
     piece2 = Piece(text="Piece 2")
-    note._pieces.append(piece1)
-    note._pieces.append(piece2)
+    note.pieces.append(piece1)
+    note.pieces.append(piece2)
 
     # Save the note
     db.session.add(note)
@@ -69,7 +69,7 @@ def test_delete_note_with_pieces(init_database):
     # Verify the note and pieces are saved
     saved_note = Note.query.first()
     assert saved_note is not None
-    assert len(saved_note._pieces) == 2
+    assert len(saved_note.pieces) == 2
 
     # Delete the note
     db.session.delete(saved_note)

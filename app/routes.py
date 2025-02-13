@@ -1,143 +1,129 @@
-from flask import Blueprint, request, jsonify
-from .models import Note, Piece, Todo
-from . import db
 from datetime import datetime
 
-notes_bp = Blueprint('notes', __name__)
+from fastapi import HTTPException
+from typing import List
+from pydantic import BaseModel
+from app.models import Todo, Note, Piece
+from main import notes, todos, app
 
-# Create a Note
-@notes_bp.route('/notes', methods=['POST'])
-def create_note():
-    data = request.get_json()
-    pieces_data = data.get('pieces', [])
 
-    note = Note()
-    for piece_content in pieces_data:
-        piece = Piece(text=piece_content)
-        note._pieces.append(piece)
+class PieceCreate(BaseModel):
+    text: str
 
-    db.session.add(note)
-    db.session.commit()
+class NoteCreate(BaseModel):
+    pieces: List[PieceCreate]
 
-    return jsonify({'message': 'Note created successfully!', 'note_id': note.id}), 201
+class PieceUpdate(BaseModel):
+    text: str
+    timestamp: datetime
 
-# Get All Notes
-@notes_bp.route('/notes', methods=['GET'])
+class NoteUpdate(BaseModel):
+    pieces: List[PieceUpdate]
+
+class TodoCreate(BaseModel):
+    text: str
+
+class TodoUpdate(BaseModel):
+    text: str
+    switchCompletion: bool
+
+@app.post('/notes/{note_id}')
+def create_note(note_id, note_data: NoteCreate):
+    note = Note(note_id)
+    for piece_content in note_data.pieces:
+        piece = Piece(piece_content.text)
+        note.add_piece(piece)
+
+    notes.append(note)
+
+    return {"message": "Note created successfully!", "note_id": note.id}
+
+
+@app.get('/notes')
 def get_notes():
-    notes = Note.query.all()
     result = []
 
     for note in notes:
-        pieces = [{'id': piece.id, 'text': piece.text, 'timestamp': piece.timestamp} for piece in note._pieces]
+        pieces = [{'text': piece.text, 'timestamp': piece.timestamp} for i, piece in enumerate(note.pieces)]
         result.append({
             'id': note.id,
-            'timestamp': note.timestamp,
+            'creation_timestamp': note.creation_timestamp,
             'last_update_timestamp': note.last_update_timestamp,
             'pieces': pieces
         })
 
-    return jsonify(result), 200
+    return result
 
-# Update a Note
-@notes_bp.route('/notes/<int:note_id>', methods=['PUT'])
-def update_note(note_id):
-    note = db.session.get(Note, note_id)  # Use Session.get() instead of Query.get()
-    if note is None:
-        return jsonify({'message': 'Note not found'}), 404
 
-    data = request.get_json()
-    pieces_data = data.get('pieces', [])
+@app.put('/notes/{note_id}')
+def update_note(note_id: int, note_data: NoteUpdate):
+    for note in notes:
+        if note.id == note_id:
+            # Clear existing pieces
+            note.pieces.clear()
 
-    # Clear existing pieces
-    note._pieces.clear()
+            # Add new pieces
+            for piece_content in note_data.pieces:
+                piece = Piece(piece_content.text, piece_content.timestamp)
+                note.add_piece(piece)
 
-    # Add new pieces
-    for piece_content in pieces_data:
-        piece = Piece(text=piece_content)
-        note._pieces.append(piece)
+            note.update_timestamp()
+            return {"message": "Note updated successfully!"}
 
-    note.last_update_timestamp = datetime.now()
-    db.session.commit()
+    raise HTTPException(status_code=404, detail="Note not found")
 
-    return jsonify({'message': 'Note updated successfully!'}), 200
 
-# Delete a Note
-@notes_bp.route('/notes/<int:note_id>', methods=['DELETE'])
-def delete_note(note_id):
-    note = db.session.get(Note, note_id)  # Use Session.get() instead of Query.get()
-    if note is None:
-        return jsonify({'message': 'Note not found'}), 404
+@app.delete('/notes/{note_id}')
+def delete_note(note_id: int):
+    for i, note in enumerate(notes):
+        if note.id == note_id:
+            del notes[i]
+            return {"message": "Note deleted successfully!"}
 
-    db.session.delete(note)
-    db.session.commit()
+    raise HTTPException(status_code=404, detail="Note not found")
 
-    return jsonify({'message': 'Note deleted successfully!'}), 200
 
-# Create a To-do
-@notes_bp.route('/todos', methods=['POST'])
-def create_todo():
-    data = request.get_json()
-    text_data = data.get('text', '')
+@app.post('/todos/{todo_id')
+def create_todo(todo_id: int, todo_data: TodoCreate):
+    todo = Todo(todo_id, todo_data.text)
+    todos.append(todo)
 
-    todo = Todo(text_data)
+    return {"message": "Todo created successfully!", "todo_id": todo.id}
 
-    db.session.add(todo)
-    db.session.commit()
 
-    return jsonify({'message': 'Todo created successfully!', 'todo_id': todo.id}), 201
+@app.get('/todos/{todo_id}')
+def get_todo(todo_id: int):
+    for todo in todos:
+        if todo.id == todo_id:
+            return {
+                'id': todo.id,
+                'text': todo.text,
+                'timestamp': todo.timestamp,
+                'completion_timestamp': todo.completion_timestamp,
+                'completed': todo.completed
+            }
 
-# Get a To_do
-@notes_bp.route('/todos/<int:todo_id>', methods=['GET'])
-def get_todo(todo_id):
-    todo = db.session.get(Todo, todo_id)  # Use Session.get() instead of Query.get()
-    if todo is None:
-        return jsonify({'message': 'Todo not found'}), 404
+    raise HTTPException(status_code=404, detail="Todo not found")
 
-    return jsonify({
-        'id': todo.id,
-        'text': todo.text,
-        'timestamp': todo.timestamp,
-        'completion_timestamp': todo.completion_timestamp,
-        'completed': todo.completed
-    }), 200
 
-# Update a To_do
-@notes_bp.route('/todos/<int:todo_id>', methods=['PUT'])
-def update_todo(todo_id):
-    todo = db.session.get(Todo, todo_id)  # Use Session.get() instead of Query.get()
-    if todo is None:
-        return jsonify({'message': 'Todo not found'}), 404
+@app.put('/todos/{todo_id}')
+def update_todo(todo_id: int, todo_data: TodoUpdate):
+    for todo in todos:
+        if todo.id == todo_id:
+            if todo_data.text:
+                todo.text = todo_data.text
+            if todo_data.switchCompletion:
+                todo.switch_completion()
+            return {"message": "Todo updated successfully!"}
 
-    data = request.get_json()
-    text = data.get('text')
+    raise HTTPException(status_code=404, detail="Todo not found")
 
-    if text:
-        todo.text = text
 
-    db.session.commit()
+@app.delete('/todos/{todo_id}')
+def delete_todo(todo_id: int):
+    for i, todo in enumerate(todos):
+        if todo.id == todo_id:
+            del todos[i]
+            return {"message": "Todo deleted successfully!"}
 
-    return jsonify({'message': 'Todo updated successfully!'}), 200
-
-# Complete a To_do
-@notes_bp.route('/todos/<int:todo_id>/complete', methods=['PUT'])
-def complete_todo(todo_id):
-    todo = db.session.get(Todo, todo_id)  # Use Session.get() instead of Query.get()
-    if todo is None:
-        return jsonify({'message': 'Todo not found'}), 404
-
-    todo.complete()
-    db.session.commit()
-
-    return jsonify({'message': 'Todo completed successfully!'}), 200
-
-# Delete a To_do
-@notes_bp.route('/todos/<int:todo_id>', methods=['DELETE'])
-def delete_todo(todo_id):
-    todo = db.session.get(Todo, todo_id)  # Use Session.get() instead of Query.get()
-    if todo is None:
-        return jsonify({'message': 'Todo not found'}), 404
-
-    db.session.delete(todo)
-    db.session.commit()
-
-    return jsonify({'message': 'Todo deleted successfully!'}), 200
+    raise HTTPException(status_code=404, detail="Todo not found")

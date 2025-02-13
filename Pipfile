@@ -5,11 +5,10 @@ name = "pypi"
 
 [packages]
 sqlalchemy = "*"
-flask = "*"
-flask-sqlalchemy = "*"
 pytest = "*"
-pytest-flask = "*"
-flask-cors = "*"
+fastapi = "*"
+pydantic = "*"
+uvicorn = {extras = ["standard"], version = "*"}
 
 [dev-packages]
 

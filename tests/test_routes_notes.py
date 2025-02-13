@@ -10,8 +10,8 @@ def create_sample_note(init_database):
     note = Note()
     piece1 = Piece(text="Piece 1 content")
     piece2 = Piece(text="Piece 2 content")
-    note._pieces.append(piece1)
-    note._pieces.append(piece2)
+    note.pieces.append(piece1)
+    note.pieces.append(piece2)
     db.session.add(note)
     db.session.commit()
 
@@ -33,9 +33,9 @@ def test_create_note_success(client, init_database):
     # Verify the note was created with pieces
     note = db.session.get(Note, 1)  # Use Session.get() instead of Query.get()
     assert note is not None
-    assert len(note._pieces) == 2
-    assert note._pieces[0].text == 'Piece 1'
-    assert note._pieces[1].text == 'Piece 2'
+    assert len(note.pieces) == 2
+    assert note.pieces[0].text == 'Piece 1'
+    assert note.pieces[1].text == 'Piece 2'
 
 def test_create_note_empty_pieces(client, init_database):
     data = {}
@@ -46,7 +46,7 @@ def test_create_note_empty_pieces(client, init_database):
     # Verify that the note was created with no pieces
     note = db.session.get(Note, 1)  # Use Session.get() instead of Query.get()
     assert note is not None
-    assert len(note._pieces) == 0
+    assert len(note.pieces) == 0
 
 # Test retrieving all notes
 def test_get_notes_empty(client, init_database):
@@ -78,9 +78,9 @@ def test_update_note_success(client, init_database, create_sample_note):
 
     # Verify the note was updated with new pieces
     updated_note = db.session.get(Note, note_id)  # Use Session.get() instead of Query.get()
-    assert len(updated_note._pieces) == 2
-    assert updated_note._pieces[0].text == 'Updated Piece 1'
-    assert updated_note._pieces[1].text == 'Updated Piece 2'
+    assert len(updated_note.pieces) == 2
+    assert updated_note.pieces[0].text == 'Updated Piece 1'
+    assert updated_note.pieces[1].text == 'Updated Piece 2'
 
 def test_update_note_not_found(client, init_database):
     note_id = 999  # Non-existent note
