@@ -1,12 +1,15 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import notes_router
+
+from app.routes import notes_router, todos_router
 
 app = FastAPI()
-notes = []
-todos = []
-origins = ["*"]
+app.include_router(notes_router)
+app.include_router(todos_router)
+
+
+origins = ["http://localhost:9001"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -16,7 +19,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(notes_router, prefix="/notes")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=5000)

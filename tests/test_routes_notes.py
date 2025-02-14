@@ -1,107 +1,117 @@
-import pytest
+from fastapi.testclient import TestClient
+from main import app
 from datetime import datetime
-from app.models import Note, Piece, db
 
-@pytest.fixture
-def create_sample_note(init_database):
-    """
-    Fixture to create a sample note with two pieces for testing.
-    """
-    note = Note()
-    piece1 = Piece(text="Piece 1 content")
-    piece2 = Piece(text="Piece 2 content")
-    note.pieces.append(piece1)
-    note.pieces.append(piece2)
-    db.session.add(note)
-    db.session.commit()
+client = TestClient(app)
 
-    yield note
-
-    # Cleanup after the test
-    db.session.delete(note)
-    db.session.commit()
-
-# Test creating a note
-def test_create_note_success(client, init_database):
-    data = {
-        'pieces': ['Piece 1', 'Piece 2']
+def test_create_note():
+    """Test creating a new note"""
+    note_data = {
+        "pieces": [
+            {"text": "Piece 1"},
+            {"text": "Piece 2"}
+        ]
     }
-    response = client.post('/notes/notes', json=data)
-    assert response.status_code == 201
-    assert b'Note created successfully!' in response.data
-
-    # Verify the note was created with pieces
-    note = db.session.get(Note, 1)  # Use Session.get() instead of Query.get()
-    assert note is not None
-    assert len(note.pieces) == 2
-    assert note.pieces[0].text == 'Piece 1'
-    assert note.pieces[1].text == 'Piece 2'
-
-def test_create_note_empty_pieces(client, init_database):
-    data = {}
-    response = client.post('/notes/notes', json=data)
-    assert response.status_code == 201  # Expect success with empty pieces
-    assert b'Note created successfully!' in response.data
-
-    # Verify that the note was created with no pieces
-    note = db.session.get(Note, 1)  # Use Session.get() instead of Query.get()
-    assert note is not None
-    assert len(note.pieces) == 0
-
-# Test retrieving all notes
-def test_get_notes_empty(client, init_database):
-    response = client.get('/notes/notes')
+    response = client.post('/notes/1', json=note_data)
     assert response.status_code == 200
-    assert response.json == []
+    assert response.json() == {"message": "Note created successfully!", "note_id": 1}
 
-def test_get_notes_with_data(client, init_database, create_sample_note):
-    response = client.get('/notes/notes')
-    assert response.status_code == 200
-    assert len(response.json) == 1
-
-    # Verify the note data
-    note_data = response.json[0]
-    assert note_data['id'] == create_sample_note.id
-    assert len(note_data['pieces']) == 2
-    assert note_data['pieces'][0]['text'] == 'Piece 1 content'
-    assert note_data['pieces'][1]['text'] == 'Piece 2 content'
-
-# Test updating a note
-def test_update_note_success(client, init_database, create_sample_note):
-    note_id = create_sample_note.id
-    data = {
-        'pieces': ['Updated Piece 1', 'Updated Piece 2']
+def test_create_note_invalid_note_id():
+    """Test creating a new note with invalid note id"""
+    note_data = {
+        "pieces": [
+            {"text": "Piece 1"},
+            {"text": "Piece 2"}
+        ]
     }
-    response = client.put(f'/notes/notes/{note_id}', json=data)
-    assert response.status_code == 200
-    assert b'Note updated successfully!' in response.data
+    response = client.post('/notes/abc', json=note_data)
+    assert response.status_code == 422
 
-    # Verify the note was updated with new pieces
-    updated_note = db.session.get(Note, note_id)  # Use Session.get() instead of Query.get()
-    assert len(updated_note.pieces) == 2
-    assert updated_note.pieces[0].text == 'Updated Piece 1'
-    assert updated_note.pieces[1].text == 'Updated Piece 2'
-
-def test_update_note_not_found(client, init_database):
-    note_id = 999  # Non-existent note
-    data = {
-        'pieces': ['Updated Piece 1', 'Updated Piece 2']
+def test_get_notes():
+    """Test getting all notes"""
+    # Create a note
+    note_data = {
+        "pieces": [
+            {"text": "Piece 1"},
+            {"text": "Piece 2"}
+        ]
     }
-    response = client.put(f'/notes/notes{note_id}', json=data)
+    client.post('/notes/1', json=note_data)
+
+    response = client.get('/notes')
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+def test_get_notes_empty():
+    """Test getting all notes when there are no notes"""
+    response = client.get('/notes')
+    assert response.status_code == 200
+    assert response.json() == []
+
+def test_update_note():
+    """Test updating a note"""
+    # Create a note
+    note_data = {
+        "pieces": [
+            {"text": "Piece 1"},
+            {"text": "Piece 2"}
+        ]
+    }
+    client.post('/notes/1', json=note_data)
+
+    update_data = {
+        "pieces": [
+            {"text": "Updated Piece 1", "timestamp": datetime.now().isoformat()},
+            {"text": "Updated Piece 2", "timestamp": datetime.now().isoformat()}
+        ]
+    }
+    response = client.put('/notes/1', json=update_data)
+    assert response.status_code == 200
+    assert response.json() == {"message": "Note updated successfully!"}
+
+def test_update_note_invalid_note():
+    """Test updating a note with invalid note"""
+    update_data = {
+        "pieces": [
+            {},
+            {}
+        ]
+    }
+    response = client.put('/notes/abc', json=update_data)
+    assert response.status_code == 422
+
+def test_update_note_note_not_found():
+    """Test updating a note that does not exist"""
+    update_data = {
+        "pieces": [
+            {"text": "Updated Piece 1", "timestamp": datetime.now().isoformat()},
+            {"text": "Updated Piece 2", "timestamp": datetime.now().isoformat()}
+        ]
+    }
+    response = client.put('/notes/1', json=update_data)
     assert response.status_code == 404
 
-# Test deleting a note
-def test_delete_note_success(client, init_database, create_sample_note):
-    note_id = create_sample_note.id
-    response = client.delete(f'/notes/notes/{note_id}')
+def test_delete_note():
+    """Test deleting a note"""
+    # Create a note
+    note_data = {
+        "pieces": [
+            {"text": "Piece 1"},
+            {"text": "Piece 2"}
+        ]
+    }
+    client.post('/notes/1', json=note_data)
+
+    response = client.delete('/notes/1')
     assert response.status_code == 200
-    assert b'Note deleted successfully!' in response.data
+    assert response.json() == {"message": "Note deleted successfully!"}
 
-    # Verify the note was deleted
-    deleted_note = db.session.get(Note, note_id)  # Use Session.get() instead of Query.get()
-    assert deleted_note is None
+def test_delete_note_invalid_note_id():
+    """Test deleting a note with invalid note id"""
+    response = client.delete('/notes/abc')
+    assert response.status_code == 422
 
-def test_delete_note_not_found(client, init_database):
-    note_id = 999  # Non-existent note
-    response = client.delete(f'/notes/notes/{note_id}')
+def test_delete_note_note_not_found():
+    """Test deleting a note that does not exist"""
+    response = client.delete('/notes/1')
     assert response.status_code == 404

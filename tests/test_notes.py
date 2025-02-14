@@ -1,80 +1,84 @@
-from app.models import Note, Piece
-from app import db
+from datetime import datetime
+
+from app.models import Piece, Note
 
 
-def test_create_note_with_pieces(init_database):
-    # Create a new Note object
-    note = Note()
-    piece1 = Piece(text="This is the first piece")
-    piece2 = Piece(text="This is the second piece")
+def test_piece_init():
+    """Test Piece initialization with default timestamp."""
+    piece = Piece("Test text")
+    assert isinstance(piece.timestamp, datetime)
+    assert piece.text == "Test text"
 
-    # Add pieces to the note
-    note.pieces.append(piece1)
-    note.pieces.append(piece2)
+def test_piece_init_with_timestamp():
+    """Test Piece initialization with custom timestamp."""
+    timestamp = datetime(2022, 1, 1, 12, 0, 0)
+    piece = Piece("Test text", timestamp)
+    assert piece.timestamp == timestamp
+    assert piece.text == "Test text"
 
-    # Save the note (which saves the pieces as well)
-    db.session.add(note)
-    db.session.commit()
+def test_piece_repr():
+    """Test Piece representation."""
+    piece = Piece("Test text")
+    assert repr(piece).startswith("Piece(timestamp=")
 
-    # Fetch the note and check if it's saved correctly
-    saved_note = Note.query.first()
-    assert saved_note is not None
-    assert len(saved_note.pieces) == 2
-    assert saved_note.pieces[0].text == "This is the first piece"
-    assert saved_note.pieces[1].text == "This is the second piece"
+def test_note_init():
+    """Test Note initialization."""
+    note = Note(1)
+    assert isinstance(note.creation_timestamp, datetime)
+    assert isinstance(note.last_update_timestamp, datetime)
+    assert note.creation_timestamp == note.last_update_timestamp
+    assert note.pieces == []
 
+def test_note_add_piece():
+    """Test adding a piece to a note."""
+    note = Note(1)
+    piece = Piece("Test text")
+    note.add_piece(piece)
+    assert len(note.pieces) == 1
+    assert note.pieces[0] == piece
+    assert note.last_update_timestamp > note.creation_timestamp
 
-def test_note_update(init_database):
-    # Create a new note with some pieces
-    note = Note()
-    piece1 = Piece(text="Old piece")
-    note.pieces.append(piece1)
+def test_note_update_timestamp():
+    """Test updating the last update timestamp of a note."""
+    note = Note(1)
+    initial_timestamp = note.last_update_timestamp
+    note.update_timestamp()
+    assert note.last_update_timestamp > initial_timestamp
 
-    # Save the note
-    db.session.add(note)
-    db.session.commit()
+def test_note_repr():
+    """Test Note representation."""
+    note = Note(1)
+    assert repr(note).startswith("Note(creation_timestamp=")
 
-    # Verify that the note has 1 piece
-    saved_note = Note.query.first()
-    assert len(saved_note.pieces) == 1
-    assert saved_note.pieces[0].text == "Old piece"
+def test_piece_timestamp_accuracy():
+    """Test Piece timestamp accuracy."""
+    piece = Piece("Test text")
+    assert (datetime.now() - piece.timestamp).total_seconds() < 1
 
-    # Update the note with new pieces
-    piece2 = Piece(text="New piece 1")
-    piece3 = Piece(text="New piece 2")
-    saved_note.update([piece2, piece3])
+def test_note_timestamp_accuracy():
+    """Test Note timestamp accuracy."""
+    note = Note(1)
+    assert (datetime.now() - note.creation_timestamp).total_seconds() < 1
+    assert (datetime.now() - note.last_update_timestamp).total_seconds() < 1
 
-    db.session.commit()
+def test_note_add_multiple_pieces():
+    """Test adding multiple pieces to a note."""
+    note = Note(1)
+    piece1 = Piece("Test text 1")
+    piece2 = Piece("Test text 2")
+    note.add_piece(piece1)
+    note.add_piece(piece2)
+    assert len(note.pieces) == 2
+    assert note.pieces[0] == piece1
+    assert note.pieces[1] == piece2
 
-    # Fetch the updated note and verify changes
-    updated_note = Note.query.first()
-    assert len(updated_note.pieces) == 2
-    assert updated_note.pieces[0].text == "New piece 1"
-    assert updated_note.pieces[1].text == "New piece 2"
-    assert updated_note.last_update_timestamp > updated_note.timestamp  # Ensure last_update_timestamp is updated
-
-
-def test_delete_note_with_pieces(init_database):
-    # Create a new note and pieces
-    note = Note()
-    piece1 = Piece(text="Piece 1")
-    piece2 = Piece(text="Piece 2")
-    note.pieces.append(piece1)
-    note.pieces.append(piece2)
-
-    # Save the note
-    db.session.add(note)
-    db.session.commit()
-
-    # Verify the note and pieces are saved
-    saved_note = Note.query.first()
-    assert saved_note is not None
-    assert len(saved_note.pieces) == 2
-
-    # Delete the note
-    db.session.delete(saved_note)
-    db.session.commit()
-
-    # Verify that the note and its pieces are deleted
-    assert Note.query.count() == 0
-    assert Piece.query.count() == 0
+def test_note_update_timestamp_multiple_times():
+    """Test updating the last update timestamp of a note multiple times."""
+    note = Note(1)
+    initial_timestamp = note.last_update_timestamp
+    note.update_timestamp()
+    first_update_timestamp = note.last_update_timestamp
+    note.update_timestamp()
+    second_update_timestamp = note.last_update_timestamp
+    assert initial_timestamp < first_update_timestamp
+    assert first_update_timestamp < second_update_timestamp

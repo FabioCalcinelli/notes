@@ -9,6 +9,7 @@ pytest = "*"
 fastapi = "*"
 pydantic = "*"
 uvicorn = {extras = ["standard"], version = "*"}
+httpx = "*"
 
 [dev-packages]
 

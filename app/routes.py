@@ -1,11 +1,15 @@
 from datetime import datetime
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Path, APIRouter
 from typing import List
 from pydantic import BaseModel
 from app.models import Todo, Note, Piece
-from main import notes, todos, app
 
+notes = []
+todos = []
+
+notes_router = APIRouter()
+todos_router = APIRouter()
 
 class PieceCreate(BaseModel):
     text: str
@@ -27,8 +31,8 @@ class TodoUpdate(BaseModel):
     text: str
     switchCompletion: bool
 
-@app.post('/notes/{note_id}')
-def create_note(note_id, note_data: NoteCreate):
+@notes_router.post('/notes/{note_id}')
+def create_note(note_id: int, note_data: NoteCreate):
     note = Note(note_id)
     for piece_content in note_data.pieces:
         piece = Piece(piece_content.text)
@@ -39,7 +43,7 @@ def create_note(note_id, note_data: NoteCreate):
     return {"message": "Note created successfully!", "note_id": note.id}
 
 
-@app.get('/notes')
+@notes_router.get('/notes')
 def get_notes():
     result = []
 
@@ -55,7 +59,7 @@ def get_notes():
     return result
 
 
-@app.put('/notes/{note_id}')
+@notes_router.put('/notes/{note_id}')
 def update_note(note_id: int, note_data: NoteUpdate):
     for note in notes:
         if note.id == note_id:
@@ -73,7 +77,7 @@ def update_note(note_id: int, note_data: NoteUpdate):
     raise HTTPException(status_code=404, detail="Note not found")
 
 
-@app.delete('/notes/{note_id}')
+@notes_router.delete('/notes/{note_id}')
 def delete_note(note_id: int):
     for i, note in enumerate(notes):
         if note.id == note_id:
@@ -83,7 +87,7 @@ def delete_note(note_id: int):
     raise HTTPException(status_code=404, detail="Note not found")
 
 
-@app.post('/todos/{todo_id')
+@todos_router.post('/todos/{todo_id')
 def create_todo(todo_id: int, todo_data: TodoCreate):
     todo = Todo(todo_id, todo_data.text)
     todos.append(todo)
@@ -91,7 +95,7 @@ def create_todo(todo_id: int, todo_data: TodoCreate):
     return {"message": "Todo created successfully!", "todo_id": todo.id}
 
 
-@app.get('/todos/{todo_id}')
+@todos_router.get('/todos/{todo_id}')
 def get_todo(todo_id: int):
     for todo in todos:
         if todo.id == todo_id:
@@ -106,7 +110,7 @@ def get_todo(todo_id: int):
     raise HTTPException(status_code=404, detail="Todo not found")
 
 
-@app.put('/todos/{todo_id}')
+@todos_router.put('/todos/{todo_id}')
 def update_todo(todo_id: int, todo_data: TodoUpdate):
     for todo in todos:
         if todo.id == todo_id:
@@ -119,7 +123,7 @@ def update_todo(todo_id: int, todo_data: TodoUpdate):
     raise HTTPException(status_code=404, detail="Todo not found")
 
 
-@app.delete('/todos/{todo_id}')
+@todos_router.delete('/todos/{todo_id}')
 def delete_todo(todo_id: int):
     for i, todo in enumerate(todos):
         if todo.id == todo_id:
