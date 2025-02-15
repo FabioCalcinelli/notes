@@ -5,9 +5,9 @@ from typing import List
 from pydantic import BaseModel
 from app.models import Todo, Note, Piece
 
+
 notes = []
 todos = []
-
 notes_router = APIRouter()
 todos_router = APIRouter()
 
@@ -31,8 +31,9 @@ class TodoUpdate(BaseModel):
     text: str
     switchCompletion: bool
 
-@notes_router.post('/notes/{note_id}')
-def create_note(note_id: int, note_data: NoteCreate):
+@notes_router.post('/notes')
+def create_note(note_data: NoteCreate):
+    note_id = len(notes)
     note = Note(note_id)
     for piece_content in note_data.pieces:
         piece = Piece(piece_content.text)
@@ -87,8 +88,9 @@ def delete_note(note_id: int):
     raise HTTPException(status_code=404, detail="Note not found")
 
 
-@todos_router.post('/todos/{todo_id')
-def create_todo(todo_id: int, todo_data: TodoCreate):
+@todos_router.post('/todos/')
+def create_todo(todo_data: TodoCreate):
+    todo_id = len(todos)
     todo = Todo(todo_id, todo_data.text)
     todos.append(todo)
 
