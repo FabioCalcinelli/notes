@@ -112,6 +112,20 @@ def create_todo(todo_data: TodoCreate):
 
     return {"message": "Todo created successfully!", "todo_id": todo.id}
 
+@todos_router.get('/todos/')
+def get_todos():
+    result = []
+
+    for todo in todos:
+        result.append({
+            'id': todo.id,
+            'text': todo.text,
+            'timestamp': todo.timestamp,
+            'completion_timestamp': todo.completion_timestamp,
+            'completed': todo.completed
+        })
+
+    return result
 
 @todos_router.get('/todos/{todo_id}')
 def get_todo(todo_id: int):
