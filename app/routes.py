@@ -19,7 +19,6 @@ class NoteCreate(BaseModel):
 
 class PieceUpdate(BaseModel):
     text: str
-    timestamp: datetime
 
 class NoteUpdate(BaseModel):
     pieces: List[PieceUpdate]
@@ -64,13 +63,17 @@ def get_notes():
 def update_note(note_id: int, note_data: NoteUpdate):
     for note in notes:
         if note.id == note_id:
-            # Clear existing pieces
+            existing_pieces = note.pieces.copy()
+
             note.pieces.clear()
 
-            # Add new pieces
             for piece_content in note_data.pieces:
-                piece = Piece(piece_content.text, piece_content.timestamp)
-                note.add_piece(piece)
+                existing_piece = next((p for p in existing_pieces if p.text == piece_content.text), None)
+                if existing_piece:
+                    note.add_piece(existing_piece)
+                else:
+                    piece = Piece(piece_content.text, datetime.now())
+                    note.add_piece(piece)
 
             note.update_timestamp()
             return {"message": "Note updated successfully!"}

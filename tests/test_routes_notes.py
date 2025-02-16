@@ -43,8 +43,8 @@ def test_update_note(client: TestClient):
 
     update_data = {
         "pieces": [
-            {"text": "Updated Piece 1", "timestamp": datetime.now().isoformat()},
-            {"text": "Updated Piece 2", "timestamp": datetime.now().isoformat()}
+            {"text": "Updated Piece 1"},
+            {"text": "Updated Piece 2"}
         ]
     }
     response = client.put('/notes/1', json=update_data)
@@ -66,8 +66,8 @@ def test_update_note_note_not_found(client: TestClient):
     """Test updating a note that does not exist"""
     update_data = {
         "pieces": [
-            {"text": "Updated Piece 1", "timestamp": datetime.now().isoformat()},
-            {"text": "Updated Piece 2", "timestamp": datetime.now().isoformat()}
+            {"text": "Updated Piece 1"},
+            {"text": "Updated Piece 2"}
         ]
     }
     response = client.put('/notes/12', json=update_data)
