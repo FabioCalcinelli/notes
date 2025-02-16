@@ -29,6 +29,78 @@ def test_get_notes(client: TestClient):
     response = client.get('/notes')
     assert response.status_code == 200
 
+def test_get_note_success(client: TestClient):
+    # Create a note
+    note_data = {
+        "pieces": [
+            {"text": "Piece 1"},
+            {"text": "Piece 2"}
+        ]
+    }
+    response = client.post("/notes", json=note_data)
+    note_id = response.json()["note_id"]
+
+    # Get the note
+    response = client.get(f"/notes/{note_id}")
+    assert response.status_code == 200
+    assert response.json()["id"] == note_id
+    assert len(response.json()["pieces"]) == 2
+
+def test_get_note_not_found(client: TestClient):
+    # Try to get a non-existent note
+    response = client.get("/notes/22")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Note not found"
+
+def test_get_note_invalid_id(client: TestClient):
+    # Try to get a note with an invalid ID
+    response = client.get("/notes/xyz")
+    assert response.status_code == 422
+
+def test_get_note_empty_pieces(client: TestClient):
+    # Create a note with no pieces
+    note_data = {
+        "pieces": []
+    }
+    response = client.post("/notes", json=note_data)
+    note_id = response.json()["note_id"]
+
+    # Get the note
+    response = client.get(f"/notes/{note_id}")
+    assert response.status_code == 200
+    assert response.json()["id"] == note_id
+    assert len(response.json()["pieces"]) == 0
+
+def test_get_note_multiple_notes(client: TestClient):
+    # Create multiple notes
+    note_data1 = {
+        "pieces": [
+            {"text": "Piece 1"},
+            {"text": "Piece 2"}
+        ]
+    }
+    response = client.post("/notes", json=note_data1)
+    note_id1 = response.json()["note_id"]
+
+    note_data2 = {
+        "pieces": [
+            {"text": "Piece 3"},
+            {"text": "Piece 4"}
+        ]
+    }
+    response = client.post("/notes", json=note_data2)
+    note_id2 = response.json()["note_id"]
+
+    # Get the notes
+    response = client.get(f"/notes/{note_id1}")
+    assert response.status_code == 200
+    assert response.json()["id"] == note_id1
+    assert len(response.json()["pieces"]) == 2
+
+    response = client.get(f"/notes/{note_id2}")
+    assert response.status_code == 200
+    assert response.json()["id"] == note_id2
+    assert len(response.json()["pieces"]) == 2
 
 def test_update_note(client: TestClient):
     """Test updating a note"""

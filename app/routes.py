@@ -58,6 +58,19 @@ def get_notes():
 
     return result
 
+@notes_router.get('/notes/{note_id}')
+def get_note(note_id: int):
+    for note in notes:
+        if note.id == note_id:
+            pieces = [{'text': piece.text, 'timestamp': piece.timestamp} for i, piece in enumerate(note.pieces)]
+            return {
+                'id': note.id,
+                'creation_timestamp': note.creation_timestamp,
+                'last_update_timestamp': note.last_update_timestamp,
+                'pieces': pieces
+            }
+
+    raise HTTPException(status_code=404, detail="Note not found")
 
 @notes_router.put('/notes/{note_id}')
 def update_note(note_id: int, note_data: NoteUpdate):
