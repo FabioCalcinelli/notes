@@ -13,7 +13,7 @@ def test_create_note(client: TestClient):
     }
     response = client.post('/notes', json=note_data)
     assert response.status_code == 200
-    assert response.json() == {"message": "Note created successfully!", "note_id": 0}
+    assert response.json() == {"message": "Note created successfully!", "note_id": 1}
 
 def test_get_notes(client: TestClient):
     """Test getting all notes"""

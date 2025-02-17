@@ -32,7 +32,7 @@ class TodoUpdate(BaseModel):
 
 @notes_router.post('/notes')
 def create_note(note_data: NoteCreate):
-    note_id = len(notes)
+    note_id = len(notes)+1
     note = Note(note_id)
     for piece_content in note_data.pieces:
         piece = Piece(piece_content.text)
@@ -106,7 +106,7 @@ def delete_note(note_id: int):
 
 @todos_router.post('/todos/')
 def create_todo(todo_data: TodoCreate):
-    todo_id = len(todos)
+    todo_id = len(todos)+1
     todo = Todo(todo_id, todo_data.text)
     todos.append(todo)
 
