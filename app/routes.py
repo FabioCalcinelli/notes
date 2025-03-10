@@ -1,9 +1,11 @@
-from datetime import datetime
-
-from fastapi import HTTPException, Path, APIRouter
+from fastapi import APIRouter
 from typing import List
 from pydantic import BaseModel
-from app.models import Todo, Note, Piece
+from .database import DBNote, DBPiece
+from fastapi import Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from datetime import datetime
+from .database import get_db, DBTodo
 
 
 notes = []
@@ -30,136 +32,245 @@ class TodoUpdate(BaseModel):
     text: str
     switchCompletion: bool
 
-@notes_router.post('/notes')
-def create_note(note_data: NoteCreate):
-    note_id = len(notes)+1
-    note = Note(note_id)
-    for piece_content in note_data.pieces:
-        piece = Piece(piece_content.text)
-        note.add_piece(piece)
 
-    notes.append(note)
 
-    return {"message": "Note created successfully!", "note_id": note.id}
+
+@notes_router.post('/notes', status_code=status.HTTP_201_CREATED)
+def create_note(note_data: NoteCreate, db: Session = Depends(get_db)):
+    try:
+        # Create new note
+        db_note = DBNote(
+            creation_timestamp=datetime.now(),
+            last_update_timestamp=datetime.now()
+        )
+        db.add(db_note)
+        db.commit()
+        db.refresh(db_note)
+
+        # Add pieces
+        for piece in note_data.pieces:
+            db_piece = DBPiece(
+                text=piece.text,
+                timestamp=datetime.now(),
+                note_id=db_note.id
+            )
+            db.add(db_piece)
+
+        db.commit()
+        return {"message": "Note created successfully!", "note_id": db_note.id}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(e)}"
+        )
 
 
 @notes_router.get('/notes')
-def get_notes():
-    result = []
+def get_all_notes(db: Session = Depends(get_db)):
+    notes = db.query(DBNote).all()
+    return [
+        {
+            "id": note.id,
+            "creation_timestamp": note.creation_timestamp,
+            "last_update_timestamp": note.last_update_timestamp,
+            "pieces": [
+                {
+                    "text": piece.text,
+                    "timestamp": piece.timestamp
+                } for piece in note.pieces
+            ]
+        } for note in notes
+    ]
 
-    for note in notes:
-        pieces = [{'text': piece.text, 'timestamp': piece.timestamp} for i, piece in enumerate(note.pieces)]
-        result.append({
-            'id': note.id,
-            'creation_timestamp': note.creation_timestamp,
-            'last_update_timestamp': note.last_update_timestamp,
-            'pieces': pieces
-        })
-
-    return result
 
 @notes_router.get('/notes/{note_id}')
-def get_note(note_id: int):
-    for note in notes:
-        if note.id == note_id:
-            pieces = [{'text': piece.text, 'timestamp': piece.timestamp} for i, piece in enumerate(note.pieces)]
-            return {
-                'id': note.id,
-                'creation_timestamp': note.creation_timestamp,
-                'last_update_timestamp': note.last_update_timestamp,
-                'pieces': pieces
-            }
+def get_single_note(note_id: int, db: Session = Depends(get_db)):
+    note = db.query(DBNote).filter(DBNote.id == note_id).first()
 
-    raise HTTPException(status_code=404, detail="Note not found")
+    if not note:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Note not found"
+        )
+
+    return {
+        "id": note.id,
+        "creation_timestamp": note.creation_timestamp,
+        "last_update_timestamp": note.last_update_timestamp,
+        "pieces": [
+            {
+                "text": piece.text,
+                "timestamp": piece.timestamp
+            } for piece in note.pieces
+        ]
+    }
+
 
 @notes_router.put('/notes/{note_id}')
-def update_note(note_id: int, note_data: NoteUpdate):
-    for note in notes:
-        if note.id == note_id:
-            existing_pieces = note.pieces.copy()
+def update_note(note_id: int, note_data: NoteUpdate, db: Session = Depends(get_db)):
+    try:
+        # Get existing note
+        note = db.query(DBNote).filter(DBNote.id == note_id).first()
 
-            note.pieces.clear()
+        if not note:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Note not found"
+            )
 
-            for piece_content in note_data.pieces:
-                existing_piece = next((p for p in existing_pieces if p.text == piece_content.text), None)
-                if existing_piece:
-                    note.add_piece(existing_piece)
-                else:
-                    piece = Piece(piece_content.text, datetime.now())
-                    note.add_piece(piece)
+        # Delete existing pieces
+        db.query(DBPiece).filter(DBPiece.note_id == note_id).delete()
 
-            note.update_timestamp()
-            return {"message": "Note updated successfully!"}
+        # Add new pieces
+        for piece in note_data.pieces:
+            db_piece = DBPiece(
+                text=piece.text,
+                timestamp=datetime.now(),
+                note_id=note_id
+            )
+            db.add(db_piece)
 
-    raise HTTPException(status_code=404, detail="Note not found")
+        # Update timestamps
+        note.last_update_timestamp = datetime.now()
+
+        db.commit()
+        return {"message": "Note updated successfully!"}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(e)}"
+        )
 
 
-@notes_router.delete('/notes/{note_id}')
-def delete_note(note_id: int):
-    for i, note in enumerate(notes):
-        if note.id == note_id:
-            del notes[i]
-            return {"message": "Note deleted successfully!"}
+@notes_router.delete('/notes/{note_id}', status_code=status.HTTP_204_NO_CONTENT)
+def delete_note(note_id: int, db: Session = Depends(get_db)):
+    note = db.query(DBNote).filter(DBNote.id == note_id).first()
 
-    raise HTTPException(status_code=404, detail="Note not found")
+    if not note:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Note not found"
+        )
 
+    try:
+        # Delete associated pieces first
+        db.query(DBPiece).filter(DBPiece.note_id == note_id).delete()
+        # Delete the note
+        db.delete(note)
+        db.commit()
 
-@todos_router.post('/todos/')
-def create_todo(todo_data: TodoCreate):
-    todo_id = len(todos)+1
-    todo = Todo(todo_id, todo_data.text)
-    todos.append(todo)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(e)}"
+        )
 
-    return {"message": "Todo created successfully!", "todo_id": todo.id}
+@todos_router.post('/todos/', status_code=status.HTTP_201_CREATED)
+def create_todo(todo_data: TodoCreate, db: Session = Depends(get_db)):
+    try:
+        db_todo = DBTodo(
+            text=todo_data.text,
+            timestamp=datetime.now(),
+            completed=False,
+            completion_timestamp=None
+        )
+        db.add(db_todo)
+        db.commit()
+        db.refresh(db_todo)
+        return {"message": "Todo created successfully!", "todo_id": db_todo.id}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(e)}"
+        )
+
 
 @todos_router.get('/todos/')
-def get_todos():
-    result = []
+def get_all_todos(db: Session = Depends(get_db)):
+    todos = db.query(DBTodo).all()
+    return [
+        {
+            "id": todo.id,
+            "text": todo.text,
+            "timestamp": todo.timestamp,
+            "completed": todo.completed,
+            "completion_timestamp": todo.completion_timestamp
+        } for todo in todos
+    ]
 
-    for todo in todos:
-        result.append({
-            'id': todo.id,
-            'text': todo.text,
-            'timestamp': todo.timestamp,
-            'completion_timestamp': todo.completion_timestamp,
-            'completed': todo.completed
-        })
-
-    return result
 
 @todos_router.get('/todos/{todo_id}')
-def get_todo(todo_id: int):
-    for todo in todos:
-        if todo.id == todo_id:
-            return {
-                'id': todo.id,
-                'text': todo.text,
-                'timestamp': todo.timestamp,
-                'completion_timestamp': todo.completion_timestamp,
-                'completed': todo.completed
-            }
+def get_single_todo(todo_id: int, db: Session = Depends(get_db)):
+    todo = db.query(DBTodo).filter(DBTodo.id == todo_id).first()
 
-    raise HTTPException(status_code=404, detail="Todo not found")
+    if not todo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Todo not found"
+        )
+
+    return {
+        "id": todo.id,
+        "text": todo.text,
+        "timestamp": todo.timestamp,
+        "completed": todo.completed,
+        "completion_timestamp": todo.completion_timestamp
+    }
 
 
 @todos_router.put('/todos/{todo_id}')
-def update_todo(todo_id: int, todo_data: TodoUpdate):
-    for todo in todos:
-        if todo.id == todo_id:
-            if todo_data.text:
-                todo.text = todo_data.text
-            if todo_data.switchCompletion:
-                todo.switch_completion()
-            return {"message": "Todo updated successfully!"}
+def update_todo(todo_id: int, todo_data: TodoUpdate, db: Session = Depends(get_db)):
+    try:
+        todo = db.query(DBTodo).filter(DBTodo.id == todo_id).first()
 
-    raise HTTPException(status_code=404, detail="Todo not found")
+        if not todo:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Todo not found"
+            )
+
+        if todo_data.text is not None:
+            todo.text = todo_data.text
+
+        if todo_data.switchCompletion:
+            todo.completed = not todo.completed
+            todo.completion_timestamp = datetime.now() if todo.completed else None
+
+        db.commit()
+        return {"message": "Todo updated successfully!"}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(e)}"
+        )
 
 
-@todos_router.delete('/todos/{todo_id}')
-def delete_todo(todo_id: int):
-    for i, todo in enumerate(todos):
-        if todo.id == todo_id:
-            del todos[i]
-            return {"message": "Todo deleted successfully!"}
+@todos_router.delete('/todos/{todo_id}', status_code=status.HTTP_204_NO_CONTENT)
+def delete_todo(todo_id: int, db: Session = Depends(get_db)):
+    todo = db.query(DBTodo).filter(DBTodo.id == todo_id).first()
 
-    raise HTTPException(status_code=404, detail="Todo not found")
+    if not todo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Todo not found"
+        )
+
+    try:
+        db.delete(todo)
+        db.commit()
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(e)}"
+        )

@@ -10,6 +10,7 @@ fastapi = "*"
 pydantic = "*"
 uvicorn = {extras = ["standard"], version = "*"}
 httpx = "*"
+databases = {extras = ["all"], version = "*"}
 
 [dev-packages]
 
