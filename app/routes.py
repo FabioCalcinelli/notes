@@ -8,8 +8,6 @@ from datetime import datetime
 from .database import get_db, DBTodo
 
 
-notes = []
-todos = []
 notes_router = APIRouter()
 todos_router = APIRouter()
 
@@ -107,7 +105,6 @@ def get_single_note(note_id: int, db: Session = Depends(get_db)):
         ]
     }
 
-
 @notes_router.put('/notes/{note_id}')
 def update_note(note_id: int, note_data: NoteUpdate, db: Session = Depends(get_db)):
     try:
@@ -120,17 +117,28 @@ def update_note(note_id: int, note_data: NoteUpdate, db: Session = Depends(get_d
                 detail="Note not found"
             )
 
-        # Delete existing pieces
-        db.query(DBPiece).filter(DBPiece.note_id == note_id).delete()
+        # Get existing pieces
+        existing_pieces = db.query(DBPiece).filter(DBPiece.note_id == note_id).all()
 
-        # Add new pieces
-        for piece in note_data.pieces:
-            db_piece = DBPiece(
-                text=piece.text,
-                timestamp=datetime.now(),
-                note_id=note_id
-            )
-            db.add(db_piece)
+        # Update existing pieces
+        for i, piece in enumerate(note_data.pieces):
+            if i < len(existing_pieces):
+                # Update existing piece if text has changed
+                if piece.text != existing_pieces[i].text:
+                    existing_pieces[i].text = piece.text
+                    existing_pieces[i].timestamp = datetime.now()
+            else:
+                # Add new piece
+                db_piece = DBPiece(
+                    text=piece.text,
+                    timestamp=datetime.now(),
+                    note_id=note_id
+                )
+                db.add(db_piece)
+
+        # Delete extra existing pieces
+        for i in range(len(note_data.pieces), len(existing_pieces)):
+            db.delete(existing_pieces[i])
 
         # Update timestamps
         note.last_update_timestamp = datetime.now()
@@ -241,7 +249,7 @@ def update_todo(todo_id: int, todo_data: TodoUpdate, db: Session = Depends(get_d
 
         if todo_data.switchCompletion:
             todo.completed = not todo.completed
-            todo.completion_timestamp = datetime.now() if todo.completed else None
+            todo.completion_timestamp = datetime.now() if todo.completed else todo.completion_timestamp
 
         db.commit()
         return {"message": "Todo updated successfully!"}
