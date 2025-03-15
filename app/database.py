@@ -39,10 +39,6 @@ class DBTodo(Base):
 # Create tables in the original database
 Base.metadata.create_all(bind=engine)
 
-# Function to initialize the test database
-def init_test_db():
-    Base.metadata.create_all(bind=test_engine)
-
 # Dependency for the original database
 def get_db():
     db = SessionLocal()
