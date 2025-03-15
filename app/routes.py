@@ -258,12 +258,17 @@ def update_todo(todo_id: int, todo_data: TodoUpdate, db: Session = Depends(get_d
         db.commit()
         return {"message": "Todo updated successfully!"}
 
+    except HTTPException:
+        # Re-raise HTTPExceptions to ensure they are not caught by the generic exception handler
+        raise
+
     except Exception as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Database error: {str(e)}"
         )
+
 
 
 @todos_router.delete('/todos/{todo_id}', status_code=status.HTTP_204_NO_CONTENT)
