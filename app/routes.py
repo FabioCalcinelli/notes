@@ -146,6 +146,10 @@ def update_note(note_id: int, note_data: NoteUpdate, db: Session = Depends(get_d
         db.commit()
         return {"message": "Note updated successfully!"}
 
+    except HTTPException as e:
+        # Re-raise HTTPExceptions to ensure they are not caught by the generic exception handler
+        raise e
+
     except Exception as e:
         db.rollback()
         raise HTTPException(

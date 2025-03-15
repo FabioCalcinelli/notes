@@ -1,83 +1,200 @@
-from datetime import datetime
-from app.models import Piece, Note
 import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
-def test_piece_init():
-    """Test Piece initialization with default timestamp."""
-    piece = Piece("Test text")
-    assert isinstance(piece.timestamp, datetime)
-    assert piece.text == "Test text"
+from main import app
+from app.database import Base, get_db, DBNote, DBPiece
 
-def test_piece_init_with_timestamp():
-    """Test Piece initialization with custom timestamp."""
-    timestamp = datetime(2022, 1, 1, 12, 0, 0)
-    piece = Piece("Test text", timestamp)
-    assert piece.timestamp == timestamp
-    assert piece.text == "Test text"
+# Create a separate in-memory SQLite database for testing
+SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///:memory:"
+engine = create_engine(
+    SQLALCHEMY_TEST_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,  # Ensures same connection is used
+)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-def test_piece_repr():
-    """Test Piece representation."""
-    piece = Piece("Test text")
-    assert repr(piece).startswith("Piece(timestamp=")
+# Create the tables
+Base.metadata.create_all(bind=engine)
 
-def test_note_init():
-    """Test Note initialization."""
-    note = Note(1)
-    assert isinstance(note.creation_timestamp, datetime)
-    assert isinstance(note.last_update_timestamp, datetime)
-    assert note.creation_timestamp == note.last_update_timestamp
-    assert note.pieces == []
 
-def test_note_add_piece():
-    """Test adding a piece to a note."""
-    note = Note(1)
-    piece = Piece("Test text")
-    note.add_piece(piece)
-    assert len(note.pieces) == 1
-    assert note.pieces[0] == piece
-    assert note.last_update_timestamp > note.creation_timestamp
+# Override the dependency
+def override_get_db():
+    try:
+        db = TestingSessionLocal()
+        yield db
+    finally:
+        db.close()
 
-def test_note_update_timestamp():
-    """Test updating the last update timestamp of a note."""
-    note = Note(1)
-    initial_timestamp = note.last_update_timestamp
-    note.update_timestamp()
-    assert note.last_update_timestamp > initial_timestamp
 
-def test_note_repr():
-    """Test Note representation."""
-    note = Note(1)
-    assert repr(note).startswith("Note(creation_timestamp=")
+app.dependency_overrides[get_db] = override_get_db
 
-def test_piece_timestamp_accuracy():
-    """Test Piece timestamp accuracy."""
-    piece = Piece("Test text")
-    assert (datetime.now() - piece.timestamp).total_seconds() < 1
+client = TestClient(app)
 
-def test_note_timestamp_accuracy():
-    """Test Note timestamp accuracy."""
-    note = Note(1)
-    assert (datetime.now() - note.creation_timestamp).total_seconds() < 1
-    assert (datetime.now() - note.last_update_timestamp).total_seconds() < 1
 
-def test_note_add_multiple_pieces():
-    """Test adding multiple pieces to a note."""
-    note = Note(1)
-    piece1 = Piece("Test text 1")
-    piece2 = Piece("Test text 2")
-    note.add_piece(piece1)
-    note.add_piece(piece2)
-    assert len(note.pieces) == 2
-    assert note.pieces[0] == piece1
-    assert note.pieces[1] == piece2
+@pytest.fixture(autouse=True)
+def setup_database():
+    # Clear all data before each test
+    db = TestingSessionLocal()
+    try:
+        # Delete all data from tables
+        db.query(DBPiece).delete()
+        db.query(DBNote).delete()
+        db.commit()
+    except:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
-def test_note_update_timestamp_multiple_times():
-    """Test updating the last update timestamp of a note multiple times."""
-    note = Note(1)
-    initial_timestamp = note.last_update_timestamp
-    note.update_timestamp()
-    first_update_timestamp = note.last_update_timestamp
-    note.update_timestamp()
-    second_update_timestamp = note.last_update_timestamp
-    assert initial_timestamp < first_update_timestamp
-    assert first_update_timestamp < second_update_timestamp
+    yield
+
+    # Clear all data after each test
+    db = TestingSessionLocal()
+    try:
+        db.query(DBPiece).delete()
+        db.query(DBNote).delete()
+        db.commit()
+    except:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def test_create_note():
+    response = client.post(
+        "/notes",
+        json={"pieces": [{"text": "Test note piece 1"}, {"text": "Test note piece 2"}]}
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert "note_id" in data
+    assert data["message"] == "Note created successfully!"
+
+
+def test_get_all_notes_empty():
+    response = client.get("/notes")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_get_all_notes():
+    # Create a note first
+    create_response = client.post(
+        "/notes",
+        json={"pieces": [{"text": "Test note piece"}]}
+    )
+
+    response = client.get("/notes")
+    assert response.status_code == 200
+    notes = response.json()
+    assert len(notes) == 1
+    assert "id" in notes[0]
+    assert "creation_timestamp" in notes[0]
+    assert "last_update_timestamp" in notes[0]
+    assert "pieces" in notes[0]
+    assert len(notes[0]["pieces"]) == 1
+    assert notes[0]["pieces"][0]["text"] == "Test note piece"
+
+
+def test_get_single_note():
+    # Create a note first
+    create_response = client.post(
+        "/notes",
+        json={"pieces": [{"text": "Test note piece"}]}
+    )
+    note_id = create_response.json()["note_id"]
+
+    response = client.get(f"/notes/{note_id}")
+    assert response.status_code == 200
+    note = response.json()
+    assert note["id"] == note_id
+    assert len(note["pieces"]) == 1
+    assert note["pieces"][0]["text"] == "Test note piece"
+
+
+def test_get_single_note_not_found():
+    response = client.get("/notes/999")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Note not found"
+
+
+def test_update_note():
+    # Create a note first
+    create_response = client.post(
+        "/notes",
+        json={"pieces": [{"text": "Original text"}]}
+    )
+    note_id = create_response.json()["note_id"]
+
+    # Update the note
+    update_response = client.put(
+        f"/notes/{note_id}",
+        json={"pieces": [{"text": "Updated text"}]}
+    )
+    assert update_response.status_code == 200
+    assert update_response.json()["message"] == "Note updated successfully!"
+
+    # Verify the update
+    get_response = client.get(f"/notes/{note_id}")
+    note = get_response.json()
+    assert note["pieces"][0]["text"] == "Updated text"
+
+
+def test_update_note_remove_pieces():
+    # Create a note first with multiple pieces
+    create_response = client.post(
+        "/notes",
+        json={"pieces": [{"text": "Piece 1"}, {"text": "Piece 2"}]}
+    )
+    note_id = create_response.json()["note_id"]
+
+    # Update the note with fewer pieces
+    update_response = client.put(
+        f"/notes/{note_id}",
+        json={"pieces": [{"text": "Piece 1"}]}
+    )
+    assert update_response.status_code == 200
+
+    # Verify the update
+    get_response = client.get(f"/notes/{note_id}")
+    note = get_response.json()
+    assert len(note["pieces"]) == 1
+    assert note["pieces"][0]["text"] == "Piece 1"
+
+
+def test_update_note_not_found():
+    response = client.put(
+        "/notes/999",
+        json={"pieces": [{"text": "Updated text"}]}
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Note not found"
+
+
+def test_delete_note():
+    # Create a note first
+    create_response = client.post(
+        "/notes",
+        json={"pieces": [{"text": "Test note piece"}]}
+    )
+    note_id = create_response.json()["note_id"]
+
+    # Delete the note
+    delete_response = client.delete(f"/notes/{note_id}")
+    assert delete_response.status_code == 204
+
+    # Verify the note is deleted
+    get_response = client.get(f"/notes/{note_id}")
+    assert get_response.status_code == 404
+
+
+def test_delete_note_not_found():
+    response = client.delete("/notes/999")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Note not found"
+
+

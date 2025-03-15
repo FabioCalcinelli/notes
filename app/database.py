@@ -2,6 +2,7 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime, Foreign
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
+# Original database configuration
 SQLALCHEMY_DATABASE_URL = "sqlite:///./app.db"
 
 engine = create_engine(
@@ -9,8 +10,10 @@ engine = create_engine(
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Base class for models
 Base = declarative_base()
 
+# Model definitions
 class DBPiece(Base):
     __tablename__ = "pieces"
     id = Column(Integer, primary_key=True, index=True)
@@ -33,12 +36,20 @@ class DBTodo(Base):
     completed = Column(Boolean)
     completion_timestamp = Column(DateTime)
 
+# Create tables in the original database
 Base.metadata.create_all(bind=engine)
 
-# Dependency
+# Function to initialize the test database
+def init_test_db():
+    Base.metadata.create_all(bind=test_engine)
+
+# Dependency for the original database
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+
+
